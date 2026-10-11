@@ -1,0 +1,34 @@
+diff --git a/spa/plugins/alsa/alsa-acp-device.c b/spa/plugins/alsa/alsa-acp-device.c
+index e4e1ffc..8eb1a41 100644
+--- a/spa/plugins/alsa/alsa-acp-device.c
++++ b/spa/plugins/alsa/alsa-acp-device.c
+@@ -194,7 +194,7 @@ static int emit_node(struct impl *this, struct acp_device *dev)
+ 
+ 	info.change_mask = SPA_DEVICE_OBJECT_CHANGE_MASK_PROPS;
+ 
+-	items = alloca((dev->props.n_items + 13) * sizeof(*items));
++	items = alloca((dev->props.n_items + 14) * sizeof(*items));
+ 	n_items = 0;
+ 
+ 	snprintf(card_index, sizeof(card_index), "%d", card->index);
+@@ -242,6 +242,20 @@ static int emit_node(struct impl *this, struct acp_device *dev)
+ 	acp_dict_for_each(it, &dev->props)
+ 		items[n_items++] = SPA_DICT_ITEM_INIT(it->key, it->value);
+ 
++	/* This USB capture device advertises S24_3LE, but starting its capture
++	 * PCM in that format immediately returns -EPIPE. Use the verified working
++	 * format unless the ACP profile already specifies one. */
++	if (dev->direction == ACP_DIRECTION_CAPTURE &&
++	    spa_streq(bus, "usb") &&
++	    spa_streq(acp_dict_lookup(&card->props, SPA_KEY_DEVICE_VENDOR_ID), "0x31b2") &&
++	    spa_streq(acp_dict_lookup(&card->props, SPA_KEY_DEVICE_PRODUCT_ID), "0x0011") &&
++	    acp_dict_lookup(&dev->props, SPA_KEY_AUDIO_FORMAT) == NULL) {
++		items[n_items++] = SPA_DICT_ITEM_INIT(SPA_KEY_AUDIO_FORMAT, "S16LE");
++		spa_log_debug(this->log, "using S16LE for USB capture device %s:%s",
++				acp_dict_lookup(&card->props, SPA_KEY_DEVICE_VENDOR_ID),
++				acp_dict_lookup(&card->props, SPA_KEY_DEVICE_PRODUCT_ID));
++	}
++
+ 	info.props = &SPA_DICT_INIT(items, n_items);
+ 
+ 	spa_device_emit_object_info(&this->hooks, dev->index, &info);

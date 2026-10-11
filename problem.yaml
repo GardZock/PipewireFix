@@ -1,0 +1,69 @@
+schema_version: 1
+project: pipewire-usb-microphone-capture-fix
+purpose: >-
+  Document and provide a device-specific ALSA SPA workaround for a USB
+  microphone capture XRUN observed with PipeWire.
+status: hardware-tested-device-specific-workaround
+
+upstream:
+  repository: https://gitlab.freedesktop.org/pipewire/pipewire
+  base_revision: 77b148060acb2dca1da0480c3063d1d536a6a681
+  changed_file: spa/plugins/alsa/alsa-acp-device.c
+  patch_file: patches/fix-usb-mic-s16le.patch
+
+device:
+  manufacturer: DCMT Technology
+  product: USB Condenser Microphone
+  usb_vendor_id: "31b2"
+  usb_product_id: "0011"
+  kernel_driver: snd_usb_audio
+  alsa_device: hw:CARD=Microphone,DEV=0
+
+host:
+  motherboard: Intel H61
+  usb_controller: Intel 6 Series/C200 EHCI controller #2
+  usb_controller_pci_id: "8086:1c2d"
+  operating_system: Arch Linux
+  kernel: 6.18.55-1-lts
+  pipewire_runtime: 1.6.9
+  wireplumber: 0.5.18
+
+observation:
+  channels: 1
+  access_mode: MMAP_INTERLEAVED
+  buffer_frames: 32768
+  formats:
+    alsa_s24_3le:
+      result: "snd_pcm_start returns -EPIPE; capture enters XRUN"
+      trials:
+        48000_hz_256_frames: "3/3 failed"
+        48000_hz_512_frames: "3/3 failed"
+        44100_hz_256_frames: "2/2 failed"
+    alsa_s16_le:
+      result: "PCM starts and frames are read"
+      trials:
+        48000_hz_256_frames: "3/3 passed"
+        48000_hz_512_frames: "3/3 passed"
+        44100_hz_256_frames: "2/2 passed"
+
+workaround:
+  direction: capture-only
+  selected_format: S16LE
+  condition: >-
+    USB vendor/product match 31b2:0011 and the ACP profile has no explicit
+    audio format.
+  playback_affected: false
+  other_device_ids_affected: false
+
+validation:
+  spa_alsa_build: passed
+  git_diff_check: passed
+  patched_source_format: S16LE
+  native_pipewire_capture: streaming-for-about-7-seconds
+  spoken_capture_confirmed: true
+  recordings_retained: false
+  automated_tests: not-run
+
+limitations:
+  - "Validated on one physical microphone and one host-controller combination."
+  - "Do not generalize the result to all H61 boards or USB audio devices."
